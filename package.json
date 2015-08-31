@@ -1,0 +1,14 @@
+
+{
+  "name": "ConquestRestAPI",
+  "description": "ConquestRestAPI",
+  "author": "Thibaut CONSTANT",
+  "version": "0.0.1",
+  "dependencies": {
+    "express": "4.x.x",
+    "mysql": "2.x.x"
+  },
+  "engines": {
+    "node": "0.x.x"
+  }
+}
