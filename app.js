@@ -1,35 +1,57 @@
 var express = require('express'),
 app = express(),
-mysql = require('mysql');
+mysql = require('mysql'),
+bodyParser = require('body-parser'),
 
 mysqlPool = mysql.createPool({
-  host: 'localhost',
+  host: '127.0.0.1',
   user: 'root',
   password: 'user',
   database: 'conquest'
 });
 
+app.use(bodyParser.json());
+
 app.get('/', function(req, res){
-  res.send('ConquestRestAPI is running...');
+  res.status("200").send('ConquestRestAPI is running...');
 });
 
 app.get('/api/patients', function(req, res){
-  res.send('hello world');
+  //Return patient list
+  res.status("200").send('Return patient list');
 });
 
 app.post('/api/patients', function(req, res){
-  res.send('hello world');
+  //Create patient
+  mysqlPool.getConnection(function(err, connection) {
+		if (err) {
+			console.log(err);
+      res.status("500").send(err.toString());
+		}
+		else {
+				connection.query('INSERT INTO DICOMWorkList SET ?', req.body, function(err, result) {
+					if (err) {
+						console.log(err);
+            res.status("500").send(err.toString());
+					}
+					else {
+						res.status("201").end();
+					}
+				});
+			connection.release();
+		}
+	});
 });
 
 app.get('/api/patients/:Id', function(req, res){
-  res.send('hello world');
+  //Return patient data
 });
 app.put('/api/patients/:Id', function(req, res){
-  res.send('hello world');
+  //Update patient data
 });
 app.delete('/api/patients/:Id', function(req, res){
-  res.send('hello world');
+  //Delete patient
 });
 
 
-app.listen(8080, '127.0.0.1');
+app.listen(8080, '192.168.1.166');
