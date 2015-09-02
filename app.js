@@ -12,6 +12,23 @@ var express = require('express'),
 
 app.use(bodyParser.json());
 
+// To use with mirth 
+/*
+app.use(function(req, res, next) {
+	if (req.is('text/*')) {
+		req.text = '';
+		req.setEncoding('utf8');
+		req.on('data', function(chunk) {
+			req.text += chunk;
+		});
+		req.on('end', next);
+	}
+	else {
+		next();
+	}
+});
+*/
+
 app.get('/', function(req, res) {
   res.status("200").send('ConquestRestAPI is running...');
 });
