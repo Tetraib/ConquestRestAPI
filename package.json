@@ -8,7 +8,8 @@
   "dependencies": {
     "express": "4.x.x",
     "mysql": "2.x.x",
-    "body-parser": "1.X.X"
+    "body-parser": "1.X.X",
+    "gcloud":"0.x.x"
   },
   "engines": {
     "node": "0.x.x"
