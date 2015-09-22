@@ -7,7 +7,6 @@ var express = require('express'),
   fs = require('fs'),
   sax = require("sax"),
   process = require('child_process'),
-
   //Conquest Mysql database
   mysqlPool = mysql.createPool({
     host: '127.0.0.1',
@@ -15,12 +14,12 @@ var express = require('express'),
     password: 'user',
     database: 'conquest'
   }),
-
-  //Cloud storage connection param
+  //Google Cloud Storage Param
   gcs = gcloud.storage({
     keyFilename: './CloudDicom-1f0d0f461c12.json',
     projectId: 'axiomatic-math-616'
   });
+
 app.use(bodyParser.json());
 //
 //
@@ -38,7 +37,7 @@ var dcmxml2json = function(xmlStreamIn, callback) {
     this._parser.error = null;
     this._parser.resume();
   });
-  // Make an json from xml to send only usefull info
+  // Extract only usefull info from xml
   saxStream.on("opentag", function(node) {
     currentNode = node.attributes.NAME;
   });
@@ -49,13 +48,27 @@ var dcmxml2json = function(xmlStreamIn, callback) {
     callback(outDicomJson);
   });
 };
+// Function to send FileStream to Google Cloud Storage
+var dicom2Gcs = function(inFileStream, fileName, bucket, callback) {
+  var gcsbucket = gcs.bucket(bucket),
+    remoteWriteStream = gcsbucket.file(fileName).createWriteStream();
+  inFileStream.pipe(remoteWriteStream);
+  remoteWriteStream.on('error', function(err) {
+    console.log(err);
+  });
+  remoteWriteStream.on('finish', function() {
+    callback();
+  });
+};
 //
 //
-//Routes to handles worklist
+//Home Route
 app.get('/', function(req, res) {
   res.status("200").send('ConquestRestAPI is running...');
 });
-
+//
+//
+//Routes to handles worklist
 app.get('/v1/patients', function(req, res) {
   //Return patient list
   res.status("200").send('Return patient list');
@@ -102,36 +115,27 @@ app.post('/v1/dicoms/', function(req, res) {
     res.status("500").end();
   });
   dcmxml2json(dcm2xml.stdout, function(dcmjson) {
+    //Post dicom data to remote server
     request.post(dicomDataUrl, {
       json: dcmjson
     }, function(error, response, body) {
-      if(error){
+      if (error) {
         console.log(error);
         res.status("500").end();
-      }else if (response.statusCode == 201) {
-        // Read image from dicom
-        var dcmj2pnm = process.spawn('./dcmj2pnm', ['--quiet', '--write-jpeg', '--compr-quality', '50', dicomFile]),
-          // Send image to cloud storage
-          bucket = gcs.bucket('dicom'),
-          remoteWriteStream = bucket.file(dicomFile + ".jpg").createWriteStream();
-        dcmj2pnm.stdout.pipe(remoteWriteStream);
-        //
+      } else if (response.statusCode == 201) {
+        // Read image from dicom file
+        var dcmj2pnm = process.spawn('./dcmj2pnm', ['--quiet', '--write-jpeg', '--compr-quality', '50', dicomFile]);
         dcmj2pnm.on('error', function(err) {
           console.log(err);
           res.status("500").end();
         });
-        remoteWriteStream.on('error', function(err) {
-          console.log(err);
-          res.status("500").end();
-        });
-        // Send 201 when all done
-        remoteWriteStream.on('finish', function() {
+        // Send image to cloud storage
+        dicom2Gcs(dcmj2pnm.stdout, dcmjson.SOPInstanceUID + ".jpg", 'dicom', function() {
           res.status("201").end();
         });
       }
     });
   });
-
 });
 
 app.listen(8080);
