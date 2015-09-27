@@ -7,6 +7,8 @@ var express = require('express'),
   fs = require('fs'),
   sax = require('sax'),
   process = require('child_process'),
+  util = require('util'),
+  stream = require('stream'),
   // Conquest Mysql database
   mysqlPool = mysql.createPool({
     host: '127.0.0.1',
@@ -21,6 +23,57 @@ var express = require('express'),
   });
 
 app.use(bodyParser.json());
+
+//
+// Stream transform dicom xml to json
+var Transform = stream.Transform;
+function Dcm2json(options) {
+  // allow use without new
+  if (!(this instanceof Dcm2json)) {
+    return new Dcm2json(options);
+  }
+  // init Transform
+  Transform.call(this, options);
+}
+util.inherits(Dcm2json, Transform);
+Dcm2json.prototype._transform = function(chunk, enc, cb) {
+  var currentNode = '',
+    outDicomJson = {},
+    parser = sax.parser(false, {
+      trim: true
+    });
+    parser.onerror = function (err) {
+  console.log(err);
+};
+  parser.ontext = function(text) {
+    outDicomJson[currentNode] = text;
+  };
+  parser.onopentag = function(node) {
+    currentNode = node.attributes.NAME;
+  };
+  parser.write(chunk.toString()).close();
+  this.push(JSON.stringify(outDicomJson));
+  cb();
+};
+
+
+// Call to Stream transform dicom xml to json
+var dcm2json = Dcm2json(),
+postjson = request.post('https://dicomwebpacs-tetraib-1.c9.io/v1/images/', {
+  headers: {
+    'content-type': 'application/json'
+  }
+});
+fs.createReadStream('test.xml').pipe(dcm2json).pipe(postjson);
+postjson.on('error', function(err) {
+  console.log(err);
+});
+dcm2json.on('error', function(err) {
+  console.log(err);
+});
+
+
+
 //
 //
 // Function to convert Xml dicom stream to json
@@ -138,8 +191,8 @@ app.post('/v1/dicoms/', function(req, res) {
             // TODO--> post ok to remote image route
           }
         });
-      }else{
-        console.log('Remote did not responded 201 staus code');
+      } else {
+        console.log('Remote responded with : ' + response.statusCode);
         res.status('500').end();
       }
     });
