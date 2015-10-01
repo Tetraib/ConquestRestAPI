@@ -109,10 +109,10 @@ parser.on('startElement', function (name, attrs) {
     if(currentAttrs && text && text.trim()){
       if(first){
         rs.push('{'+JSON.stringify(currentAttrs)+' : '+JSON.stringify(text));
+        first=false;
 
       }else{
         rs.push(','+JSON.stringify(currentAttrs)+' : '+JSON.stringify(text));
-
       }
     }
   });
@@ -128,6 +128,7 @@ parser.on('startElement', function (name, attrs) {
 
     rs.push('}');
     rs.push(null);
+    first=true;
 
 
 });
@@ -144,15 +145,11 @@ parser.on('startElement', function (name, attrs) {
 
 
 dcm2xml.stdout.pipe(parser);
-var test=fs.createWriteStream('test.json');
-// postjson
-rs.pipe(test);
+rs.pipe(postjson);
 rs.on('error', function (error) {
   console.error(error);
 });
-test.on('error', function (error) {
-  console.error(error);
-});
+
 
   postjson.on('response', function(response) {
     console.log(response.statusCode); // 200
