@@ -8,7 +8,6 @@ var express = require('express'),
   fs = require('fs'),
   sax = require('sax'),
   expat = require('node-expat'),
-  libxml = require("libxmljs"),
   process = require('child_process'),
   util = require('util'),
   stream = require('stream'),
@@ -26,105 +25,6 @@ var express = require('express'),
   });
 
 app.use(bodyParser.json());
-
-//
-// Stream transform dicom xml to json
-var Transform = stream.Transform;
-
-function Dcm2json(options) {
-  // allow use without new
-  if (!(this instanceof Dcm2json)) {
-    return new Dcm2json(options);
-  }
-  // init Transform
-  Transform.call(this, options);
-}
-util.inherits(Dcm2json, Transform);
-
-Dcm2json.prototype._transform = function(chunk, enc, cb) {
-this.test='hello';
-var  string ='',
-  first=true;
-  this.parser = new libxml.SaxPushParser();
-
-  this.parser.on('startElementNS',function(elem, attrs, prefix, uri, namespace){
-    console.log('elem',elem);
-    console.log('attrs',attrs);
-  });
-  this.parser.on('characters',function(char){
-    console.log('char',char);
-  });
-
-this.parser.on('error',function(err){
-  console.log('err',err);
-});
-  this.parser.push(chunk.toString());
-
-this.push(string);
-
-  cb();
-
-
-
-
-  // saxStream.on('opentag', function(node) {
-  //   currentNode = node.attributes.NAME;
-  // });
-  // saxStream.on('text', function(text) {
-  //   outDicomJson[currentNode] = text;
-  // });
-  //
-  //
-  // if(first){
-  //       string='{'+JSON.stringify(currentNode)+':'+JSON.stringify(text);
-  //       first=false;
-  //       }else{
-  //
-  //           string+=','+JSON.stringify(currentNode)+':'+JSON.stringify(text);
-  //
-  //
-  //         }
-
-//   var currentNode = '',
-//   string ='',
-//   first=true,
-//   parser = new expat.Parser('UTF-8');
-//
-//   parser.on('error', function (error) {
-//     console.error("ERROR:",error);
-//   });
-//
-//   parser.on('startElement',function(name, attrs) {
-//     currentNode = attrs.name;
-//     console.log(attrs.name);
-//   });
-// parser.on('text', function(text) {
-//
-//     if(first){
-//       string='{'+JSON.stringify(currentNode)+':'+JSON.stringify(text);
-//       first=false;
-//       }else{
-//         if(text!='\n'){
-//           string+=','+JSON.stringify(currentNode)+':'+JSON.stringify(text);
-//         }
-//
-//         }
-//   });
-//   parser.write('<root>'+chunk.toString());
-
-//
-//
-
-};
-Dcm2json.prototype._flush = function (cb) {
-    this.push('}');
-    console.log(this.test);
-  cb();
-};
-
-
-
-
 
 // Function to send FileStream to Google Cloud Storage
 var dicom2Gcs = function(inFileStream, fileName, bucket, callback) {
@@ -188,41 +88,72 @@ app.post('/v1/dicoms/', function(req, res) {
   // Read xml data from dicom
   var dicomFile = req.body.file,
     dicomDataUrl = 'https://dicomwebpacs-tetraib-1.c9.io/v1/images/',
-    dcm2xml = process.spawn('./dcm2xml', ['--quiet','--read-file-only',dicomFile]);
+    dcm2xml = process.spawn('./dcm2xml', ['--quiet',dicomFile]);
   dcm2xml.on('error', function(err) {
     console.log(err);
     res.status('500').end();
   });
 
+var parser = new expat.Parser('UTF-8');
+var currentAttrs='';
+var first = true;
+var rs = new stream.Readable();
+rs._read = function () {};
+
+parser.on('startElement', function (name, attrs) {
+  if(attrs.name){
+    currentAttrs=attrs.name.trim();
+  }
+  });
+  parser.on('text', function (text) {
+    if(currentAttrs && text && text.trim()){
+      if(first){
+        rs.push('{'+JSON.stringify(currentAttrs)+' : '+JSON.stringify(text));
+
+      }else{
+        rs.push(','+JSON.stringify(currentAttrs)+' : '+JSON.stringify(text));
+
+      }
+    }
+  });
+
+  parser.on('error', function (error) {
+    console.error(error);
+  });
+
+  parser.on('end', function () {
+    console.error('end');
+
+
+
+    rs.push('}');
+    rs.push(null);
+
+
+});
+
   // Call to Stream transform dicom xml to json
-  var dcm2json = new Dcm2json(),
-    postjson = request(dicomDataUrl, {
+  var postjson = request(dicomDataUrl, {
     method: 'POST',
       headers: {
         'content-type': 'application/json'
       }
     });
-test3='{';
-test4='"hello":"test"';
-test5='}';
 
-var rs = new stream.Readable();
-rs.push(test3);
-rs.push(test4);
-rs.push(test5);
-rs.push(null);
 
-rs.pipe(postjson);
-  // dcm2xml.stdout.pipe(dcm2json).pipe(postjson);
-  // .pipe(test2);
-  // .pipe(postjson);
 
-  dcm2json.on('error', function(err) {
-    console.log(err);
-  });
-  postjson.on('error', function(err) {
-    console.log(err);
-  });
+
+dcm2xml.stdout.pipe(parser);
+var test=fs.createWriteStream('test.json');
+// postjson
+rs.pipe(test);
+rs.on('error', function (error) {
+  console.error(error);
+});
+test.on('error', function (error) {
+  console.error(error);
+});
+
   postjson.on('response', function(response) {
     console.log(response.statusCode); // 200
 
