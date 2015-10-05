@@ -1,17 +1,16 @@
-
 {
   "name": "ConquestRestAPI",
   "description": "ConquestRestAPI",
   "author": "Thibaut CONSTANT",
   "version": "0.0.1",
-  "license":"GPL-3.0",
+  "license": "GPL-3.0",
   "dependencies": {
-    "express": "4.x.x",
-    "mysql": "2.x.x",
-    "request":"2.x.x",
     "body-parser": "1.X.X",
-    "gcloud":"0.x.x",
-    "sax":"1.x.x"
+    "express": "4.x.x",
+    "jpegtran": "0.x.x",
+    "mysql": "2.x.x",
+    "node-expat": "2.x.x",
+    "request": "2.x.x"
   },
   "engines": {
     "node": "0.x.x"
