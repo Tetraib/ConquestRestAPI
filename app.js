@@ -67,7 +67,7 @@ app.post('/v1/dicoms/', function(req, res) {
   //
   // Read xml data from dicom
   var dicomFile = req.body.file,
-    dcm2xml = process.spawn('./dcm2xml', ['--quiet', dicomFile]);
+    dcm2xml = process.spawn('./dcm2xml', ['--quiet', '+Ca', 'latin-1', dicomFile]);
 
   dcm2xml.on('error', function(err) {
     console.log(err);
@@ -106,44 +106,38 @@ app.post('/v1/dicoms/', function(req, res) {
   parser.on('error', function(err) {
     console.error(err);
   });
-
-  var postjson = request('https://dicomwebpacs-tetraib-1.c9.io/v1/images/', {
+  var postJsonOpt = {
+    url: 'https://dicomwebpacs-tetraib-1.c9.io/v1/images/',
     method: 'POST',
     headers: {
       'content-type': 'application/json'
     }
-  });
+  };
+
 
   dcm2xml.stdout.pipe(parser);
-  rs.pipe(postjson);
-
-
-  postjson.on('error', function(err) {
-    console.error(err);
-  });
+  rs.pipe(request(postJsonOpt));
 
   /**
    *
    * Treat image
    */
-  var putimage = request('https://dicomwebpacs-tetraib-1.c9.io/v1/images/1010/', {
-      method: 'PUT'
-    }),
-    dcmj2pnm = process.spawn('./dcmj2pnm', ['--quiet', '--write-jpeg', '--compr-quality', '90', dicomFile]),
+
+  var putImageOpt = {
+    url: 'https://dicomwebpacs-tetraib-1.c9.io/v1/images/1010/',
+    method: 'PUT'
+  };
+  var dcmj2pnm = process.spawn('./dcmj2pnm', ['--quiet', '--write-jpeg', '--compr-quality', '90', dicomFile]),
     myJpegTranslator = new JpegTran(['-progressive', '-optimize', '-copy', 'none']);
 
-  dcmj2pnm.stdout.pipe(myJpegTranslator).pipe(putimage);
-
   dcmj2pnm.on('error', function(err) {
-    console.log(err);
-  });
-  putimage.on('error', function(err) {
     console.log(err);
   });
   myJpegTranslator.on('error', function(err) {
     console.log(err);
   });
 
+  dcmj2pnm.stdout.pipe(myJpegTranslator).pipe(request(putImageOpt));
   res.status('202').end();
 
 });
