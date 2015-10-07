@@ -65,7 +65,7 @@ app.delete('/v1/patients/:Id', function(req, res) {
  */
 app.post('/v1/dicoms/', function(req, res) {
   var dicomFile = req.body.file,
-  // Options for request http POST xml
+    // Options for request http POST xml
     postJsonOpt = {
       url: 'https://dicomwebpacs-tetraib-1.c9.io/v1/images/',
       method: 'POST',
@@ -77,9 +77,9 @@ app.post('/v1/dicoms/', function(req, res) {
     dcm2xml = process.spawn('./dcm2xml', ['--quiet', '+Ca', 'latin-1', dicomFile]);
 
   dcm2xml.on('error', function(err) {
-    console.log(err);
+    console.log('dcm2xml', err);
   });
-// New XML parser
+  // New XML parser
   var parser = new expat.Parser('UTF-8'),
     currentAttrs = '',
     first = true,
@@ -87,7 +87,7 @@ app.post('/v1/dicoms/', function(req, res) {
     rs = new stream.Readable();
   rs._read = function() {};
   rs.on('error', function(err) {
-    console.error(err);
+    console.error('rs', err);
   });
 
   parser.on('startElement', function(name, attrs) {
@@ -114,18 +114,18 @@ app.post('/v1/dicoms/', function(req, res) {
   });
 
   parser.on('error', function(err) {
-    console.error(err);
+    console.error('parser', err);
   });
 
   dcm2xml.stdout.pipe(parser);
   rs.pipe(request(postJsonOpt).on('error', function(err) {
-    console.log(err);
+    console.log('postJsonOpt', err);
   }).on('response', function(response) {
     /**
      *
      * Treat image
      */
-    if(response.statusCode=='201'){
+    if (response.statusCode == '201') {
       // Options for request http PUT image
       var putImageOpt = {
           url: 'https://dicomwebpacs-tetraib-1.c9.io/v1/images/123/',
@@ -137,14 +137,14 @@ app.post('/v1/dicoms/', function(req, res) {
         myJpegTranslator = new JpegTran(['-progressive', '-optimize', '-copy', 'none']);
 
       dcmj2pnm.on('error', function(err) {
-        console.log(err);
+        console.log('dcmj2pnm', err);
       });
       myJpegTranslator.on('error', function(err) {
-        console.log(err);
+        console.log('myJpegTranslator', err);
       });
 
       dcmj2pnm.stdout.pipe(myJpegTranslator).pipe(request(putImageOpt).on('error', function(err) {
-        console.log(err);
+        console.log('putImageOpt', err);
       }));
     }
   }));
